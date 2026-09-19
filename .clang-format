@@ -1,0 +1,21 @@
+# Indentation
+BasedOnStyle: Google
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+NamespaceIndentation: All
+DerivePointerAlignment: false
+PointerAlignment: Right
+
+# Wrapping
+ColumnLimit: 160
+BinPackParameters: false
+ReflowComments: true
+
+# Grouping & reordering for includes
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^<.*'
+    Priority: 1
+  - Regex: '.*'
+    Priority: 2

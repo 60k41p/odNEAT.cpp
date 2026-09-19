@@ -1,0 +1,61 @@
+{
+    "version": 6,
+    "configurePresets": [
+        {
+            "name": "release",
+            "displayName": "Release (Ninja, default)",
+            "description": "Default cross-platform Release build using Ninja.",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "BUILD_TESTING": "ON",
+                "ODNEAT_BUILD_DEMOS": "ON"
+            }
+        },
+        {
+            "name": "release-make",
+            "displayName": "Release (Unix Makefiles fallback)",
+            "description": "Makefile fallback when Ninja is unavailable.",
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build-make",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "BUILD_TESTING": "ON",
+                "ODNEAT_BUILD_DEMOS": "ON"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "release",
+            "configurePreset": "release",
+            "configuration": "Release"
+        },
+        {
+            "name": "release-make",
+            "configurePreset": "release-make",
+            "configuration": "Release"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "release",
+            "configurePreset": "release",
+            "configuration": "Release",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "release-make",
+            "configurePreset": "release-make",
+            "configuration": "Release",
+            "output": {
+                "outputOnFailure": true
+            }
+        }
+    ]
+}
