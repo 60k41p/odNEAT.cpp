@@ -83,7 +83,8 @@ namespace odneat {
 
             for (int robot_index = 0; robot_index < options.robot_count; ++robot_index) {
                 agent_group.emplace_back(static_cast<std::uint32_t>(robot_index), input_count, output_count, minimum_energy, maximum_energy, default_energy,
-                                         minimum_energy, agent_params, options.random_seed + static_cast<std::uint64_t>(robot_index) * 7919ULL);
+                                         minimum_energy, agent_params,
+                                         options.random_seed + static_cast<std::uint64_t>(robot_index) * static_cast<std::uint64_t>(7919ULL));
                 agent_group.back().setExchangeEnabled(options.exchange_enabled);
                 agent_group.back().setTabuEnabled(options.tabu_enabled);
                 agent_group.back().setMaturationEnabled(options.maturation_enabled);
@@ -102,7 +103,7 @@ namespace odneat {
             AggregationEnergyUpdater aggregation_updater{};
             NavigationEnergyUpdater navigation_updater{};
             PhototaxisEnergyUpdater phototaxis_updater{};
-            std::mt19937_64 noiseGenerator(options.random_seed + 12345ULL);
+            std::mt19937_64 noiseGenerator(options.random_seed + static_cast<std::uint64_t>(12345ULL));
             std::normal_distribution<double> actuatorNoise(0.0, simulation_params.noise_standard_deviation);
             double light_position_x = 1.0;
             double light_position_y = 1.0;

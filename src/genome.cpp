@@ -59,8 +59,9 @@ namespace odneat {
         }
 
         // Deterministic RNG so all robots share identical initial weights (distance 0) with symmetry broken across edges.
-        std::mt19937_64 weight_rng(
-            static_cast<std::uint64_t>(0xC0FFEEULL + static_cast<std::uint64_t>(input_count) * 131ULL + static_cast<std::uint64_t>(output_count) * 17ULL));
+        std::mt19937_64 weight_rng(static_cast<std::uint64_t>(static_cast<std::uint64_t>(0xC0FFEEULL) +
+                                                              static_cast<std::uint64_t>(input_count) * static_cast<std::uint64_t>(131ULL) +
+                                                              static_cast<std::uint64_t>(output_count) * static_cast<std::uint64_t>(17ULL)));
         std::uniform_real_distribution<double> weight_dist(-1.0, 1.0);
         std::uint64_t conn_seq = 0;
         for (const NeuronGene &input_gene : input_genes) {

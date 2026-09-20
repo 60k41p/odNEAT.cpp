@@ -49,8 +49,9 @@ namespace odneat {
     struct InnovationIdHash {
         std::size_t operator()(const InnovationId &innovation_id) const noexcept {
             std::size_t seed = std::hash<std::uint32_t>{}(innovation_id.robot_identifier);
-            seed ^= std::hash<std::uint64_t>{}(innovation_id.timestamp_nanoseconds) + 0x9E3779B97F4A7C15ULL + (seed << 6U) + (seed >> 2U);
-            seed ^= std::hash<std::uint32_t>{}(innovation_id.local_counter) + 0x9E3779B97F4A7C15ULL + (seed << 6U) + (seed >> 2U);
+            seed ^=
+                std::hash<std::uint64_t>{}(innovation_id.timestamp_nanoseconds) + static_cast<std::size_t>(0x9E3779B97F4A7C15ULL) + (seed << 6U) + (seed >> 2U);
+            seed ^= std::hash<std::uint32_t>{}(innovation_id.local_counter) + static_cast<std::size_t>(0x9E3779B97F4A7C15ULL) + (seed << 6U) + (seed >> 2U);
             return seed;
         }
     };
