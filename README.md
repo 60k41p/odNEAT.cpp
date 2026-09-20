@@ -1,3 +1,5 @@
+[![CI](https://github.com/60k41p/odNEAT.cpp/actions/workflows/ci.yml/badge.svg)](https://github.com/60k41p/odNEAT.cpp/actions/workflows/ci.yml)
+
 # odNEAT.cpp
 
 C++23 implementation of odNEAT: An Algorithm for Decentralised Online Evolution of Robotic Controllers.
