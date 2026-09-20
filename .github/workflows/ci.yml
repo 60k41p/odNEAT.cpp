@@ -1,0 +1,117 @@
+# CI: build + test odNEAT on Linux / Windows / macOS, plus format and packaging checks.
+#
+# Canonical local flow (mirrored here):
+#   cmake --preset release
+#   cmake --build --preset release
+#   ctest --preset release --output-on-failure
+
+name: CI
+
+on:
+  push:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build-and-test:
+    name: build+test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-26.04, windows-2025, macos-26]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up MSVC environment (Windows only)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Show toolchain versions
+        run: |
+          cmake --version
+          ninja --version
+          c++ --version || cxx --version || cl 2>&1 | head -5
+
+      - name: Configure (release preset)
+        run: cmake --preset release
+
+      - name: Build (release preset)
+        run: cmake --build --preset release
+
+      - name: Test (release preset)
+        run: ctest --preset release --output-on-failure
+
+      - name: Demo smoke runs
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            ./build/minimal_embed.exe
+            ./build/run_experiment.exe --task aggregation --cycles 50 --seed 42
+          else
+            ./build/minimal_embed
+            ./build/run_experiment --task aggregation --cycles 50 --seed 42
+          fi
+
+      - name: Install library
+        run: cmake --install build --prefix "$RUNNER_TEMP/odneat-install"
+
+      - name: Downstream packaging test (find_package consumer)
+        run: |
+          CONSUMER_DIR="$RUNNER_TEMP/odneat-consumer"
+          rm -rf "$CONSUMER_DIR"
+          mkdir -p "$CONSUMER_DIR"
+          cat > "$CONSUMER_DIR/CMakeLists.txt" <<'EOF'
+          cmake_minimum_required(VERSION 3.28)
+          project(odneat_consumer LANGUAGES CXX)
+          find_package(odneat 1.0 REQUIRED)
+          add_executable(consumer main.cpp)
+          target_link_libraries(consumer PRIVATE odneat::odneat)
+          EOF
+          cat > "$CONSUMER_DIR/main.cpp" <<'EOF'
+          #include "odneat.h"
+          int main() {
+              odneat::OdneatParams params{};
+              (void)params;
+              return 0;
+          }
+          EOF
+          cmake -S "$CONSUMER_DIR" -B "$CONSUMER_DIR/build" -G Ninja \
+            -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/odneat-install" \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build "$CONSUMER_DIR/build"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            "$CONSUMER_DIR/build/consumer.exe"
+          else
+            "$CONSUMER_DIR/build/consumer"
+          fi
+
+  format:
+    name: clang-format check
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format
+
+      - name: Check formatting
+        run: |
+          clang-format --version
+          git ls-files '*.cpp' '*.h' | xargs clang-format --dry-run --Werror

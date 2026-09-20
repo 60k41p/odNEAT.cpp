@@ -1,8 +1,8 @@
 #include <iostream>
 #include <string>
 
-#include "experiment_driver.h"
 #include "config.h"
+#include "experiment_driver.h"
 
 int main(int argument_count, char *argument_values[]) {
     std::string task_name = "aggregation";

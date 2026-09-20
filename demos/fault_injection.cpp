@@ -2,8 +2,8 @@
 #include <string>
 #include <vector>
 
-#include "experiment_driver.h"
 #include "config.h"
+#include "experiment_driver.h"
 #include "sim/simulation.h"
 
 int main(int argument_count, char *argument_values[]) {
