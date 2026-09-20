@@ -1,5 +1,6 @@
 #include "agent.h"
 
+#include <exception>
 #include <sstream>
 
 #include "mutation.h"
@@ -157,7 +158,13 @@ namespace odneat {
         std::mt19937_64 parsed_generator{};
         {
             std::istringstream random_stream{state.random_state};
-            random_stream >> parsed_generator;
+            try {
+                random_stream >> parsed_generator;
+            } catch (const std::exception &) {
+                // MSVC's mersenne_twister extractor throws std::invalid_argument on
+                // corrupt input where other standard libraries set failbit instead.
+                return fail("random state is corrupt");
+            }
             if (random_stream.fail()) {
                 return fail("random state is corrupt");
             }

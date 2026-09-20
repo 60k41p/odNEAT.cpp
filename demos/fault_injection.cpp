@@ -29,7 +29,7 @@ int main(int argument_count, char *argument_values[]) {
     experiment_options.task_kind = odneat::demos::parseTaskKind(task_name);
     experiment_options.control_cycles = control_cycles;
     experiment_options.random_seed = random_seed;
-    std::mt19937_64 faultGenerator(random_seed + 999ULL);
+    std::mt19937_64 faultGenerator(random_seed + static_cast<std::uint64_t>(999ULL));
     std::vector<odneat::sim::SimulatedRobot> probeBodies(5);
     odneat::sim::placeRobotsUniformly(probeBodies, faultGenerator, simulation_params);
     int injected_faults = 0;
