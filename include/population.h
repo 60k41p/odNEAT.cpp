@@ -84,6 +84,9 @@ namespace odneat {
         // Overwrites the stored copy matching the given genome's topology with fresh fitness
         // statistics; returns false when no identical genome is stored.
         bool syncStoredFitness(const Genome &genome, double fitness, int evaluation_count);
+        // Restores an exact persisted genome list (checkpoint resume): replaces contents
+        // and re-speciates once instead of incremental insert/evict logic.
+        void restoreGenomes(const std::vector<Genome> &genomes);
 
        private:
         // Maximum number of genomes retained locally (paper default 40).

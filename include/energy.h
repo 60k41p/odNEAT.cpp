@@ -63,6 +63,8 @@ namespace odneat {
         int getSampleCount() const;
         // Resets the accumulator for a fresh controller.
         void resetAverager();
+        // Restores a persisted mean and sample count (checkpoint resume without replaying samples).
+        void restoreState(double mean_fitness, int sample_count);
 
        private:
         // Running mean of sampled energy levels.

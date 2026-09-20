@@ -1,4 +1,6 @@
+#include <cstddef>
 #include <iostream>
+#include <vector>
 
 #include "genome.h"
 #include "innovation_clock.h"
@@ -81,6 +83,37 @@ int run_tabu_suite() {
         f3.clearTabuList();
         if (f3.getTabuSize() != 0 || !f3.getRecentHistory().empty()) {
             std::cout << "FAIL: clear\n";
+            ++f;
+        }
+    }
+
+    // restoreState replaces contents verbatim, keeping only the most recent window entries.
+    {
+        odneat::TabuList f4(1.0, 1.0, 0.4, 3.0, 4);
+        odneat::InnovationClock c4(3);
+        odneat::Genome blocked = odneat::Genome::createMinimalGenome(2, 2, c4);
+        std::vector<odneat::Genome> history{};
+        for (int i = 0; i < 6; ++i) {
+            odneat::Genome other = odneat::Genome::createMinimalGenome(6, 2, c4);
+            other.accessConnectionGenes().front().weight = 1.0 + static_cast<double>(i);
+            history.push_back(other);
+        }
+        f4.restoreState({blocked}, history);
+        if (f4.getTabuSize() != 1 || f4.getRecentHistory().size() != 4) {
+            std::cout << "FAIL: restore trims window\n";
+            ++f;
+        } else {
+            // Only the last four histories are kept, in order.
+            for (std::size_t i = 0; i < 4; ++i) {
+                if (!f4.getRecentHistory()[i].isIdenticalTo(history[i + 2])) {
+                    std::cout << "FAIL: restore keeps newest\n";
+                    ++f;
+                    break;
+                }
+            }
+        }
+        if (f4.approvesCandidate(blocked)) {
+            std::cout << "FAIL: restore keeps tabu\n";
             ++f;
         }
     }

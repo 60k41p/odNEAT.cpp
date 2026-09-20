@@ -40,6 +40,10 @@ namespace odneat {
         std::size_t getTabuSize() const;
         // Clears tabu memory and recent history.
         void clearTabuList();
+        // Restores exact persisted tabu and recent-history lists (checkpoint resume):
+        // replaces contents verbatim without running expiry; recent history beyond
+        // the window keeps only the most recent entries.
+        void restoreState(const std::vector<Genome> &tabu_genomes, const std::vector<Genome> &recent_history);
 
        private:
         // NEAT disjoint coefficient c2 for similarity tests.

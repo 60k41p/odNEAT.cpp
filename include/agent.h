@@ -10,7 +10,9 @@
 #define ODNEAT_AGENT_H_
 
 #include <cstddef>
+#include <cstdint>
 #include <random>
+#include <string>
 #include <vector>
 
 #include "broadcast.h"
@@ -52,6 +54,59 @@ namespace odneat {
     };
 
     // OdneatAgent runs the full online evolution loop for a single robot.
+    // AgentCheckpointState is a plain snapshot of everything needed to resume evolution
+    // bit-identically (see serialization.h for the JSON encoding of this state).
+    struct AgentCheckpointState {
+        // Robot identifier stamped into innovations.
+        std::uint32_t robot_identifier = 0;
+        // Controller input dimensionality.
+        int input_count = 0;
+        // Controller output dimensionality.
+        int output_count = 0;
+        // Evolutionary rates and population limits.
+        OdneatParams parameters{};
+        // Active genotype decoded into the running controller.
+        Genome active_genome{};
+        // Internal population in insertion order.
+        std::vector<Genome> population_genomes{};
+        // Tabu memory of failed solutions.
+        std::vector<Genome> tabu_genomes{};
+        // Sliding window of recently received genomes driving tabu expiry.
+        std::vector<Genome> recent_history{};
+        // Lower clamp bound of the energy range.
+        double minimum_energy = 0.0;
+        // Upper clamp bound of the energy range.
+        double maximum_energy = 0.0;
+        // Energy assigned to fresh controllers.
+        double default_energy = 0.0;
+        // Replacement threshold.
+        double minimum_threshold = 0.0;
+        // Current energy level.
+        double current_energy = 0.0;
+        // Running mean of sampled energy levels.
+        double fitness_mean = 0.0;
+        // Number of samples contributing to fitness_mean.
+        int fitness_sample_count = 0;
+        // Innovation clock minted counter.
+        std::uint32_t clock_minted_count = 0;
+        // Innovation clock last timestamp.
+        std::uint64_t clock_last_timestamp = 0;
+        // Full mt19937_64 stream state via operator<< / operator>> round-trip.
+        std::string random_state{};
+        // Remaining protected cycles before replacement is allowed.
+        int maturation_cycles_remaining = 0;
+        // Number of controllers evaluated so far.
+        int evaluation_count = 0;
+        // Whether genome exchange is enabled.
+        bool exchange_enabled = true;
+        // Whether the tabu filter is enabled.
+        bool tabu_enabled = true;
+        // Whether the maturation guard is enabled.
+        bool maturation_enabled = true;
+        // Whether speciation with fitness sharing is enabled.
+        bool speciation_enabled = true;
+    };
+
     class OdneatAgent {
        public:
         // Constructs an agent with robot identity, controller dimensions, energy bounds and evolutionary parameters.
@@ -82,6 +137,36 @@ namespace odneat {
         int getEvaluationCount() const;
         // Returns the mutable random generator for task and channel code sharing the stream.
         std::mt19937_64 &accessRandomGenerator();
+        // Returns the evolutionary parameters (rates, limits, coefficients).
+        const OdneatParams &getParameters() const;
+        // Returns the controller input dimensionality.
+        int getInputCount() const;
+        // Returns the controller output dimensionality.
+        int getOutputCount() const;
+        // Returns the minimum energy bound.
+        double getMinimumEnergy() const;
+        // Returns the maximum energy bound.
+        double getMaximumEnergy() const;
+        // Returns the default refill energy.
+        double getDefaultEnergy() const;
+        // Returns the replacement threshold.
+        double getMinimumThreshold() const;
+        // Returns how many energy samples contributed to the fitness estimate.
+        int getFitnessSampleCount() const;
+        // Returns whether genome exchange is enabled.
+        bool isExchangeEnabled() const;
+        // Returns whether the tabu filter is enabled.
+        bool isTabuEnabled() const;
+        // Returns whether the maturation guard is enabled.
+        bool isMaturationEnabled() const;
+        // Returns whether speciation with fitness sharing is enabled.
+        bool isSpeciationEnabled() const;
+        // Exports the full resumable state (checkpoint snapshot).
+        AgentCheckpointState exportCheckpointState() const;
+        // Restores a state produced by exportCheckpointState; the target must share robot
+        // identifier, input/output counts and energy bounds (parameters are adopted).
+        // Returns false with an optional message and leaves the agent untouched on mismatch.
+        bool restoreCheckpointState(const AgentCheckpointState &state, std::string *error_message = nullptr);
         // Executes one Algorithm 1 control cycle given normalised sensor inputs and an energy delta from the task.
         // Legacy single-phase entry (broadcast+incorporate+step+energy); driver uses split API below for exact timing.
         AgentStepResult executeControlCycle(const std::vector<double> &sensor_inputs, double energy_delta, const std::vector<ReceivedGenome> &received_genomes);

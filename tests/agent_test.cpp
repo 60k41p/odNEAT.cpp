@@ -1,6 +1,7 @@
 #include "agent.h"
 
 #include <iostream>
+#include <string>
 #include <vector>
 
 #include "config.h"
@@ -201,6 +202,119 @@ int run_agent_suite() {
             std::cout << "FAIL: fallback packages active\n";
             ++f;
         }
+    }
+
+    // Introspection getters reflect construction arguments and runtime state.
+    {
+        odneat::OdneatParams mp;
+        mp.maturation_period_cycles = 100;
+        odneat::OdneatAgent agent(12, 4, 2, 0.0, 100.0, 50.0, 0.0, mp, 37ULL);
+        if (agent.getInputCount() != 4 || agent.getOutputCount() != 2) {
+            std::cout << "FAIL: controller dims\n";
+            ++f;
+        }
+        if (agent.getMinimumEnergy() != 0.0 || agent.getMaximumEnergy() != 100.0 || agent.getDefaultEnergy() != 50.0 || agent.getMinimumThreshold() != 0.0) {
+            std::cout << "FAIL: energy bounds\n";
+            ++f;
+        }
+        if (agent.getParameters().maturation_period_cycles != 100) {
+            std::cout << "FAIL: parameters\n";
+            ++f;
+        }
+        if (!agent.isExchangeEnabled() || !agent.isTabuEnabled() || !agent.isMaturationEnabled() || !agent.isSpeciationEnabled()) {
+            std::cout << "FAIL: flags default on\n";
+            ++f;
+        }
+        agent.setExchangeEnabled(false);
+        agent.setTabuEnabled(false);
+        if (agent.isExchangeEnabled() || agent.isTabuEnabled()) {
+            std::cout << "FAIL: flags toggle\n";
+            ++f;
+        }
+    }
+
+    // Direct export/restore round-trips state; every validation rejects without partial mutation.
+    {
+        odneat::OdneatParams mp;
+        mp.maturation_period_cycles = 10;
+        mp.internal_population_size = 10;
+        odneat::OdneatAgent source(14, 4, 2, 0.0, 100.0, 50.0, 0.0, mp, 41ULL);
+        const std::vector<double> sensors(4, 0.5);
+        for (int i = 0; i < 12; ++i) {
+            source.executeControlCycle(sensors, 1.0, {});
+        }
+        odneat::AgentCheckpointState state = source.exportCheckpointState();
+        odneat::OdneatAgent target(14, 4, 2, 0.0, 100.0, 50.0, 0.0, mp, 43ULL);
+        std::string error_message{};
+        if (!target.restoreCheckpointState(state, &error_message)) {
+            std::cout << "FAIL: direct restore\n";
+            ++f;
+        }
+        if (!target.getActiveGenome().isIdenticalTo(source.getActiveGenome()) || target.getEnergy() != source.getEnergy()) {
+            std::cout << "FAIL: direct restore values\n";
+            ++f;
+        }
+        // Nullptr error sink also restores.
+        odneat::OdneatAgent null_target(14, 4, 2, 0.0, 100.0, 50.0, 0.0, mp, 47ULL);
+        if (!null_target.restoreCheckpointState(state, nullptr)) {
+            std::cout << "FAIL: restore nullptr error\n";
+            ++f;
+        }
+
+        auto expect_reject = [&](odneat::AgentCheckpointState bad, const char *message) {
+            odneat::OdneatAgent candidate(14, 4, 2, 0.0, 100.0, 50.0, 0.0, mp, 53ULL);
+            const odneat::Genome before = candidate.getActiveGenome();
+            std::string local_error{};
+            if (candidate.restoreCheckpointState(bad, &local_error)) {
+                std::cout << "FAIL: " << message << " accepted\n";
+                ++f;
+            }
+            if (local_error.empty()) {
+                std::cout << "FAIL: " << message << " reports error\n";
+                ++f;
+            }
+            if (!candidate.getActiveGenome().isIdenticalTo(before)) {
+                std::cout << "FAIL: " << message << " untouched\n";
+                ++f;
+            }
+            // Nullptr sink rejects too.
+            if (candidate.restoreCheckpointState(bad, nullptr)) {
+                std::cout << "FAIL: " << message << " nullptr rejects\n";
+                ++f;
+            }
+        };
+
+        odneat::AgentCheckpointState bad_dims = state;
+        bad_dims.input_count = 6;
+        expect_reject(bad_dims, "dims mismatch");
+
+        odneat::AgentCheckpointState bad_energy = state;
+        bad_energy.maximum_energy = 999.0;
+        expect_reject(bad_energy, "energy bounds mismatch");
+
+        odneat::AgentCheckpointState bad_active = state;
+        bad_active.active_genome = odneat::Genome();
+        expect_reject(bad_active, "empty active");
+
+        odneat::AgentCheckpointState bad_population = state;
+        bad_population.population_genomes.clear();
+        expect_reject(bad_population, "empty population");
+
+        odneat::AgentCheckpointState bad_capacity = state;
+        bad_capacity.parameters.internal_population_size = 0;
+        expect_reject(bad_capacity, "population exceeds capacity");
+
+        odneat::AgentCheckpointState bad_counters = state;
+        bad_counters.evaluation_count = 0;
+        expect_reject(bad_counters, "invalid counters");
+
+        odneat::AgentCheckpointState bad_random = state;
+        bad_random.random_state.clear();
+        expect_reject(bad_random, "empty random state");
+
+        odneat::AgentCheckpointState corrupt_random = state;
+        corrupt_random.random_state = "not a valid mt19937_64 stream !!!";
+        expect_reject(corrupt_random, "corrupt random state");
     }
 
     if (f == 0) std::cout << "test_agent passed\n";

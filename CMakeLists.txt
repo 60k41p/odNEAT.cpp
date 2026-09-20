@@ -8,8 +8,12 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+include(FetchContent)
+
 option(ODNEAT_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
 option(ODNEAT_BUILD_DEMOS "Build experiment demos" ON)
+option(ODNEAT_BUILD_EXAMPLES "Build library usage examples" ON)
+option(ODNEAT_USE_SYSTEM_GLAZE "Use an installed glaze package instead of FetchContent" OFF)
 option(BUILD_TESTING "Build CTest unit tests" ON)
 
 if(MSVC)
@@ -19,6 +23,19 @@ else()
     if(ODNEAT_WARNINGS_AS_ERRORS)
         add_compile_options(-Werror)
     endif()
+endif()
+
+if(ODNEAT_USE_SYSTEM_GLAZE)
+    find_package(glaze 8.4.0 REQUIRED)
+else()
+    FetchContent_Declare(
+        glaze
+        GIT_REPOSITORY https://github.com/stephenberry/glaze.git
+        GIT_TAG v8.4.0
+        GIT_SHALLOW TRUE
+        SYSTEM
+    )
+    FetchContent_MakeAvailable(glaze)
 endif()
 
 add_library(odneat
@@ -33,11 +50,24 @@ add_library(odneat
     src/tabu_list.cpp
     src/broadcast.cpp
     src/agent.cpp
+    src/serialization.cpp
     src/tasks/task_energies.cpp
     src/sim/simulation.cpp
 )
-target_include_directories(odneat PUBLIC include)
+add_library(odneat::odneat ALIAS odneat)
+target_include_directories(odneat PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
 target_compile_features(odneat PUBLIC cxx_std_23)
+# Glaze is a private header-only backend: needed to build serialization.cpp but
+# never appears in public headers, so it must not propagate to install consumers.
+target_link_libraries(odneat PRIVATE $<BUILD_INTERFACE:glaze::glaze>)
+
+if(MSVC)
+    # Glaze requires a conformant preprocessor on MSVC.
+    target_compile_options(odneat PRIVATE /Zc:preprocessor)
+endif()
 
 if(ODNEAT_BUILD_DEMOS)
     add_executable(run_experiment demos/run_experiment.cpp)
@@ -48,6 +78,11 @@ if(ODNEAT_BUILD_DEMOS)
 
     add_executable(ablation demos/ablation.cpp)
     target_link_libraries(ablation PRIVATE odneat)
+endif()
+
+if(ODNEAT_BUILD_EXAMPLES)
+    add_executable(minimal_embed examples/minimal_embed.cpp)
+    target_link_libraries(minimal_embed PRIVATE odneat)
 endif()
 
 if(BUILD_TESTING)
@@ -70,6 +105,7 @@ if(BUILD_TESTING)
         tests/task_energies_test.cpp
         tests/simulation_test.cpp
         tests/integration_test.cpp
+        tests/serialization_test.cpp
     )
     target_link_libraries(odneat_tests PRIVATE odneat)
 
@@ -91,4 +127,39 @@ if(BUILD_TESTING)
     odneat_add_suite(test_task_energies)
     odneat_add_suite(test_simulation)
     odneat_add_suite(test_integration)
+    odneat_add_suite(test_serialization)
+
+    if(ODNEAT_BUILD_EXAMPLES)
+        # The embed example doubles as a smoke test: it must keep building, running
+        # and round-tripping a checkpoint (also covers the odneat.h umbrella header).
+        add_test(NAME example_minimal_embed COMMAND minimal_embed)
+    endif()
 endif()
+
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+install(TARGETS odneat EXPORT odneatTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} FILES_MATCHING PATTERN "*.h")
+install(EXPORT odneatTargets FILE odneatTargets.cmake NAMESPACE odneat:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/odneat)
+
+configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/odneatConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/odneatConfig.cmake"
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/odneat
+)
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/odneatConfigVersion.cmake"
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/odneatConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/odneatConfigVersion.cmake"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/odneat
+)

@@ -1,5 +1,7 @@
 #include "agent.h"
 
+#include <sstream>
+
 #include "mutation.h"
 
 namespace odneat {
@@ -62,6 +64,127 @@ namespace odneat {
     int OdneatAgent::getEvaluationCount() const { return evaluation_count_; }
 
     std::mt19937_64 &OdneatAgent::accessRandomGenerator() { return random_generator_; }
+
+    const OdneatParams &OdneatAgent::getParameters() const { return parameters_; }
+
+    int OdneatAgent::getInputCount() const { return input_count_; }
+
+    int OdneatAgent::getOutputCount() const { return output_count_; }
+
+    double OdneatAgent::getMinimumEnergy() const { return energy_tracker_.getMinimumEnergy(); }
+
+    double OdneatAgent::getMaximumEnergy() const { return energy_tracker_.getMaximumEnergy(); }
+
+    double OdneatAgent::getDefaultEnergy() const { return energy_tracker_.getDefaultEnergy(); }
+
+    double OdneatAgent::getMinimumThreshold() const { return energy_tracker_.getMinimumThreshold(); }
+
+    int OdneatAgent::getFitnessSampleCount() const { return fitness_averager_.getSampleCount(); }
+
+    bool OdneatAgent::isExchangeEnabled() const { return exchange_enabled_; }
+
+    bool OdneatAgent::isTabuEnabled() const { return tabu_enabled_; }
+
+    bool OdneatAgent::isMaturationEnabled() const { return maturation_enabled_; }
+
+    bool OdneatAgent::isSpeciationEnabled() const { return speciation_enabled_; }
+
+    AgentCheckpointState OdneatAgent::exportCheckpointState() const {
+        AgentCheckpointState state{};
+        state.robot_identifier = robot_identifier_;
+        state.input_count = input_count_;
+        state.output_count = output_count_;
+        state.parameters = parameters_;
+        state.active_genome = active_genome_;
+        state.population_genomes = population_.getGenomes();
+        state.tabu_genomes = tabu_list_.getTabuGenomes();
+        const std::deque<Genome> &recent_history = tabu_list_.getRecentHistory();
+        state.recent_history.assign(recent_history.begin(), recent_history.end());
+        state.minimum_energy = energy_tracker_.getMinimumEnergy();
+        state.maximum_energy = energy_tracker_.getMaximumEnergy();
+        state.default_energy = energy_tracker_.getDefaultEnergy();
+        state.minimum_threshold = energy_tracker_.getMinimumThreshold();
+        state.current_energy = energy_tracker_.getEnergy();
+        state.fitness_mean = fitness_averager_.getFitness();
+        state.fitness_sample_count = fitness_averager_.getSampleCount();
+        const auto clock_state = innovation_clock_.exportState();
+        state.clock_minted_count = clock_state.first;
+        state.clock_last_timestamp = clock_state.second;
+        std::ostringstream random_stream{};
+        random_stream << random_generator_;
+        state.random_state = random_stream.str();
+        state.maturation_cycles_remaining = maturation_cycles_remaining_;
+        state.evaluation_count = evaluation_count_;
+        state.exchange_enabled = exchange_enabled_;
+        state.tabu_enabled = tabu_enabled_;
+        state.maturation_enabled = maturation_enabled_;
+        state.speciation_enabled = speciation_enabled_;
+        return state;
+    }
+
+    bool OdneatAgent::restoreCheckpointState(const AgentCheckpointState &state, std::string *error_message) {
+        auto fail = [&](const std::string &message) -> bool {
+            if (error_message != nullptr) {
+                *error_message = message;
+            }
+            return false;
+        };
+        if (state.robot_identifier != robot_identifier_) {
+            return fail("robot identifier mismatch");
+        }
+        if (state.input_count != input_count_ || state.output_count != output_count_) {
+            return fail("controller dimensions mismatch");
+        }
+        if (state.minimum_energy != energy_tracker_.getMinimumEnergy() || state.maximum_energy != energy_tracker_.getMaximumEnergy() ||
+            state.default_energy != energy_tracker_.getDefaultEnergy() || state.minimum_threshold != energy_tracker_.getMinimumThreshold()) {
+            return fail("energy bounds mismatch");
+        }
+        if (state.active_genome.getNeuronGenes().empty() || state.active_genome.getConnectionGenes().empty()) {
+            return fail("active genome is empty");
+        }
+        if (state.population_genomes.empty()) {
+            return fail("population is empty");
+        }
+        if (static_cast<std::size_t>(state.population_genomes.size()) > static_cast<std::size_t>(state.parameters.internal_population_size)) {
+            return fail("population exceeds capacity");
+        }
+        if (state.fitness_sample_count < 0 || state.maturation_cycles_remaining < 0 || state.evaluation_count < 1) {
+            return fail("invalid counters");
+        }
+        if (state.random_state.empty()) {
+            return fail("random state is empty");
+        }
+        std::mt19937_64 parsed_generator{};
+        {
+            std::istringstream random_stream{state.random_state};
+            random_stream >> parsed_generator;
+            if (random_stream.fail()) {
+                return fail("random state is corrupt");
+            }
+        }
+        parameters_ = state.parameters;
+        population_ = InternalPopulation(state.parameters.internal_population_size, state.parameters.disjoint_coefficient, state.parameters.excess_coefficient,
+                                         state.parameters.weight_difference_coefficient, state.parameters.compatibility_threshold);
+        tabu_list_ = TabuList(state.parameters.disjoint_coefficient, state.parameters.excess_coefficient, state.parameters.weight_difference_coefficient,
+                              state.parameters.compatibility_threshold, state.parameters.tabu_expiry_history_size);
+        population_.restoreGenomes(state.population_genomes);
+        tabu_list_.restoreState(state.tabu_genomes, state.recent_history);
+        energy_tracker_.setEnergy(state.current_energy);
+        fitness_averager_.restoreState(state.fitness_mean, state.fitness_sample_count);
+        innovation_clock_.restoreState(state.clock_minted_count, state.clock_last_timestamp);
+        random_generator_ = parsed_generator;
+        active_genome_ = state.active_genome;
+        active_controller_ = RecurrentNetwork::decodeFromGenome(active_genome_, input_count_, output_count_);
+        active_controller_.resetActivations();
+        maturation_cycles_remaining_ = state.maturation_cycles_remaining;
+        evaluation_count_ = state.evaluation_count;
+        exchange_enabled_ = state.exchange_enabled;
+        tabu_enabled_ = state.tabu_enabled;
+        maturation_enabled_ = state.maturation_enabled;
+        speciation_enabled_ = state.speciation_enabled;
+        population_.setNichingEnabled(state.speciation_enabled);
+        return true;
+    }
 
     AgentStepResult OdneatAgent::executeControlCycle(const std::vector<double> &sensor_inputs,
                                                      double energy_delta,

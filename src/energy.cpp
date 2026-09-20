@@ -47,4 +47,9 @@ namespace odneat {
         sample_count_ = 0;
     }
 
+    void FitnessAverager::restoreState(double mean_fitness, int sample_count) {
+        mean_fitness_ = mean_fitness;
+        sample_count_ = sample_count;
+    }
+
 }  // namespace odneat

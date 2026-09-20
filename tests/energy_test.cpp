@@ -92,6 +92,22 @@ int run_energy_suite() {
         }
     }
 
+    // restoreState resumes the running mean without replaying individual samples.
+    {
+        odneat::FitnessAverager restored;
+        restored.restoreState(20.0, 3);
+        if (restored.getFitness() != 20.0 || restored.getSampleCount() != 3) {
+            std::cout << "FAIL: restore state\n";
+            ++f;
+        }
+
+        restored.addEnergySample(30.0);
+        if (restored.getSampleCount() != 4 || restored.getFitness() != 22.5) {
+            std::cout << "FAIL: resume after restore\n";
+            ++f;
+        }
+    }
+
     if (f == 0) std::cout << "test_energy passed\n";
 
     return f == 0 ? 0 : 1;

@@ -21,6 +21,7 @@ int run_agent_suite();
 int run_task_energies_suite();
 int run_simulation_suite();
 int run_integration_suite();
+int run_serialization_suite();
 
 namespace {
 
@@ -44,6 +45,7 @@ namespace {
         {"test_task_energies", run_task_energies_suite},
         {"test_simulation", run_simulation_suite},
         {"test_integration", run_integration_suite},
+        {"test_serialization", run_serialization_suite},
     };
 
     void listSuites() {

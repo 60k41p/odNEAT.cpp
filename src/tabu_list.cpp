@@ -68,4 +68,16 @@ namespace odneat {
         recent_history_.clear();
     }
 
+    void TabuList::restoreState(const std::vector<Genome> &tabu_genomes, const std::vector<Genome> &recent_history) {
+        tabu_genomes_ = tabu_genomes;
+        recent_history_.clear();
+        std::size_t keep_from = std::size_t{0};
+        if (recent_history.size() > static_cast<std::size_t>(recent_history_size_)) {
+            keep_from = recent_history.size() - static_cast<std::size_t>(recent_history_size_);
+        }
+        for (std::size_t genome_index = keep_from; genome_index < recent_history.size(); ++genome_index) {
+            recent_history_.push_back(recent_history[genome_index]);
+        }
+    }
+
 }  // namespace odneat

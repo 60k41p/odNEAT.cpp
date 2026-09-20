@@ -227,6 +227,37 @@ int run_population_suite() {
         }
     }
 
+    // restoreGenomes replaces contents verbatim and re-speciates exactly once.
+    {
+        odneat::InternalPopulation pop(4, 1.0, 1.0, 0.4, 3.0);
+        odneat::InnovationClock clock(9);
+        odneat::Genome first = odneat::Genome::createMinimalGenome(2, 2, clock);
+        first.setFitness(10.0);
+        first.setEvaluationCount(2);
+        odneat::Genome second = odneat::Genome::createMinimalGenome(2, 2, clock);
+        second.accessConnectionGenes().front().weight += 5.0;
+        second.setFitness(30.0);
+        second.setEvaluationCount(1);
+        pop.restoreGenomes({first, second});
+        if (pop.getCurrentSize() != 2) {
+            std::cout << "FAIL: restore size\n";
+            ++f;
+        } else {
+            if (!pop.getGenomes()[0].isIdenticalTo(first) || !pop.getGenomes()[1].isIdenticalTo(second)) {
+                std::cout << "FAIL: restore order\n";
+                ++f;
+            }
+            if (pop.getGenomes()[0].getFitness() != 10.0 || pop.getGenomes()[0].getEvaluationCount() != 2) {
+                std::cout << "FAIL: restore fitness\n";
+                ++f;
+            }
+        }
+        if (pop.getSpecies().empty()) {
+            std::cout << "FAIL: restore speciates\n";
+            ++f;
+        }
+    }
+
     if (f == 0) std::cout << "test_population passed\n";
 
     return f == 0 ? 0 : 1;

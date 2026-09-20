@@ -219,6 +219,11 @@ namespace odneat {
         return false;
     }
 
+    void InternalPopulation::restoreGenomes(const std::vector<Genome> &genomes) {
+        genomes_ = genomes;
+        refreshSpeciation();
+    }
+
     void InternalPopulation::refreshSpeciation() {
         if (!niching_enabled_) {
             // "No niching" ablation (paper Sec. 6.2): one shared species, no fitness sharing.
