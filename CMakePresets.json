@@ -26,6 +26,20 @@
                 "BUILD_TESTING": "ON",
                 "ODNEAT_BUILD_DEMOS": "ON"
             }
+        },
+        {
+            "name": "sanitize",
+            "displayName": "Sanitize (Ninja, Clang/GCC, ASan+UBSan)",
+            "description": "Debug build with AddressSanitizer and UndefinedBehaviorSanitizer. Requires Clang or GCC: configure with CC=clang CXX=clang++ in the environment.",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build-sanitize",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "BUILD_TESTING": "ON",
+                "ODNEAT_BUILD_DEMOS": "ON",
+                "ODNEAT_SANITIZE": "ON"
+            }
         }
     ],
     "buildPresets": [
@@ -38,6 +52,11 @@
             "name": "release-make",
             "configurePreset": "release-make",
             "configuration": "Release"
+        },
+        {
+            "name": "sanitize",
+            "configurePreset": "sanitize",
+            "configuration": "Debug"
         }
     ],
     "testPresets": [
@@ -53,6 +72,14 @@
             "name": "release-make",
             "configurePreset": "release-make",
             "configuration": "Release",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "sanitize",
+            "configurePreset": "sanitize",
+            "configuration": "Debug",
             "output": {
                 "outputOnFailure": true
             }

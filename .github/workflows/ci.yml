@@ -115,3 +115,32 @@ jobs:
         run: |
           clang-format --version
           git ls-files '*.cpp' '*.h' | xargs clang-format --dry-run --Werror
+
+  sanitizers:
+    name: sanitizers (clang ASan+UBSan)
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    env:
+      CC: clang
+      CXX: clang++
+      ASAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure Clang toolchain
+        run: |
+          clang++ --version || (sudo apt-get update && sudo apt-get install -y clang)
+          cmake --version
+          ninja --version
+
+      - name: Configure (sanitize preset)
+        run: cmake --preset sanitize
+
+      - name: Build (sanitize preset)
+        run: cmake --build --preset sanitize
+
+      - name: Test (sanitize preset)
+        run: ctest --preset sanitize --output-on-failure
