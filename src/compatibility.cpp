@@ -2,14 +2,19 @@
 
 #include <algorithm>
 #include <cmath>
+#include <unordered_map>
 
 #include "config.h"
 #include "genome.h"
 
 namespace odneat {
 
-    CompatibilityBreakdown analyseCompatibility(
-        const Genome &first_genome, const Genome &second_genome, double disjoint_coefficient, double excess_coefficient, double weight_difference_coefficient) {
+    CompatibilityBreakdown analyseCompatibility(const Genome &first_genome,
+                                                const Genome &second_genome,
+                                                double disjoint_coefficient,
+                                                double excess_coefficient,
+                                                double weight_difference_coefficient,
+                                                double activation_mismatch_coefficient) {
         CompatibilityBreakdown breakdown{};
         const std::vector<ConnectionGene> &first_connections = first_genome.getConnectionGenes();
         const std::vector<ConnectionGene> &second_connections = second_genome.getConnectionGenes();
@@ -74,6 +79,23 @@ namespace odneat {
             }
         }
 
+        // Activation mismatches over matching hidden/output neurons (inputs and bias ignore the transfer field).
+        {
+            std::unordered_map<InnovationId, const NeuronGene *, InnovationIdHash> second_neurons_by_id{};
+            second_neurons_by_id.reserve(second_genome.getNeuronGenes().size() * 2);
+            for (const NeuronGene &neuron_gene : second_genome.getNeuronGenes()) {
+                second_neurons_by_id.emplace(neuron_gene.innovation_id, &neuron_gene);
+            }
+            for (const NeuronGene &neuron_gene : first_genome.getNeuronGenes()) {
+                if (neuron_gene.neuron_type != NeuronType::kHidden && neuron_gene.neuron_type != NeuronType::kOutput) continue;
+                const auto entry = second_neurons_by_id.find(neuron_gene.innovation_id);
+                if (entry == second_neurons_by_id.end()) continue;
+                const NeuronGene *other = entry->second;
+                if (other->neuron_type != NeuronType::kHidden && other->neuron_type != NeuronType::kOutput) continue;
+                if (other->activation != neuron_gene.activation) ++breakdown.activation_mismatch_count;
+            }
+        }
+
         if (breakdown.matching_count > 0) {
             breakdown.mean_weight_difference = weight_difference_sum / static_cast<double>(breakdown.matching_count);
         }
@@ -88,15 +110,20 @@ namespace odneat {
 
         breakdown.distance = (disjoint_coefficient * static_cast<double>(breakdown.disjoint_count) / breakdown.normaliser) +
                              (excess_coefficient * static_cast<double>(breakdown.excess_count) / breakdown.normaliser) +
-                             (weight_difference_coefficient * breakdown.mean_weight_difference);
+                             (weight_difference_coefficient * breakdown.mean_weight_difference) +
+                             (activation_mismatch_coefficient * static_cast<double>(breakdown.activation_mismatch_count) / breakdown.normaliser);
 
         return breakdown;
     }
 
-    double computeCompatibilityDistance(
-        const Genome &first_genome, const Genome &second_genome, double disjoint_coefficient, double excess_coefficient, double weight_difference_coefficient) {
-        const CompatibilityBreakdown breakdown =
-            analyseCompatibility(first_genome, second_genome, disjoint_coefficient, excess_coefficient, weight_difference_coefficient);
+    double computeCompatibilityDistance(const Genome &first_genome,
+                                        const Genome &second_genome,
+                                        double disjoint_coefficient,
+                                        double excess_coefficient,
+                                        double weight_difference_coefficient,
+                                        double activation_mismatch_coefficient) {
+        const CompatibilityBreakdown breakdown = analyseCompatibility(first_genome, second_genome, disjoint_coefficient, excess_coefficient,
+                                                                      weight_difference_coefficient, activation_mismatch_coefficient);
         return breakdown.distance;
     }
 
@@ -105,9 +132,10 @@ namespace odneat {
                               double disjoint_coefficient,
                               double excess_coefficient,
                               double weight_difference_coefficient,
-                              double compatibility_threshold) {
-        const double distance =
-            computeCompatibilityDistance(first_genome, second_genome, disjoint_coefficient, excess_coefficient, weight_difference_coefficient);
+                              double compatibility_threshold,
+                              double activation_mismatch_coefficient) {
+        const double distance = computeCompatibilityDistance(first_genome, second_genome, disjoint_coefficient, excess_coefficient,
+                                                             weight_difference_coefficient, activation_mismatch_coefficient);
         return distance < compatibility_threshold;
     }
 
@@ -115,7 +143,8 @@ namespace odneat {
                                             double disjoint_coefficient,
                                             double excess_coefficient,
                                             double weight_difference_coefficient,
-                                            double compatibility_threshold) {
+                                            double compatibility_threshold,
+                                            double activation_mismatch_coefficient) {
         std::vector<Species> species_list{};
         species_list.reserve(genomes.size());
         int next_species_id = 0;
@@ -127,7 +156,7 @@ namespace odneat {
             for (Species &species : species_list) {
                 const Genome &representative_genome = genomes[species.representative_index];
                 if (areGenomesCompatible(candidate_genome, representative_genome, disjoint_coefficient, excess_coefficient, weight_difference_coefficient,
-                                         compatibility_threshold)) {
+                                         compatibility_threshold, activation_mismatch_coefficient)) {
                     species.member_indices.push_back(genome_index);
                     placed_in_species = true;
                     break;

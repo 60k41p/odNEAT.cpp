@@ -177,8 +177,9 @@ namespace odneat {
         void incorporateExternal(const std::vector<ReceivedGenome> &received_genomes, int &accepted_count, int &merged_count, int &rejected_count);
         // Steps the active controller only; returns raw network outputs in [0,1], no energy update.
         std::vector<double> stepController(const std::vector<double> &sensor_inputs);
-        // Applies task energy, samples fitness, ticks maturation and replaces on depletion; returns replacement.
-        bool updateEnergyAndMaybeReplace(double energy_delta);
+        // Applies task energy, samples fitness, ticks maturation and replaces on depletion; returns replacement. When evaluated_fitness is non-null it
+        // receives the evaluated genome's final fitness (post-sample mean, before any replacement resets the averager) for caller-side observation.
+        bool updateEnergyAndMaybeReplace(double energy_delta, double *evaluated_fitness = nullptr);
         // Forces controller replacement regardless of energy (used by tests and fault injection).
         void forceControllerReplacement();
         // Enables or disables genome exchange (ablation: exchange off discards received genomes after counting).
@@ -189,6 +190,13 @@ namespace odneat {
         void setMaturationEnabled(bool maturation_enabled);
         // Enables or disables speciation (ablation: single species, no fitness sharing adjustment).
         void setSpeciationEnabled(bool speciation_enabled);
+        // Resets the active controller's hidden/output activations (bias back to 1.0) for stateless re-evaluation from a fixed start. Recurrent
+        // control loops that step once per cycle should not call it and keep persistent state across steps.
+        void resetControllerActivations();
+        // Seeds the innovation clock to a deterministic base derived from the given seed (a huge timestamp far above wall-clock nanos, so subsequent
+        // nextInnovationId mints are last+1,last+2... independent of system time) for reproducible runs. Checkpoint restore still overwrites with
+        // persisted state.
+        void seedDeterministicClock(std::uint64_t seed);
 
        private:
         // Unique robot identity stamped into innovations and logs.

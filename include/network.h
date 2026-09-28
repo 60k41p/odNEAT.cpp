@@ -23,6 +23,10 @@ namespace odneat {
     // Bias param is retained for API compat; phenotypes use bias-neuron edges so callers pass 0.
     double computeLogisticActivation(double weighted_sum, double bias, double slope);
 
+    // Evaluates the transfer function selected by a neuron gene (logistic keeps
+    // the slope parameter; CPPN functions are slope-free).
+    double computeActivation(ActivationFn activation_function, double weighted_sum, double slope);
+
     // RecurrentNetwork is the executable phenotype of a Genome with persistent activations across steps.
     class RecurrentNetwork {
        public:
@@ -61,6 +65,8 @@ namespace odneat {
             bool is_bias = false;
             // Sensor slot copied into this neuron when is_input is true.
             int input_index = -1;
+            // Transfer function for hidden/output neurons (copied from the gene).
+            ActivationFn activation_function = ActivationFn::kLogistic;
             // True for motor output neurons read after the synchronous update.
             bool is_output = false;
             // Motor slot written by this neuron when is_output is true.

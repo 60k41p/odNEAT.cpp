@@ -1,10 +1,17 @@
-# Checkpoint JSON format (v1)
+# Checkpoint JSON format (v1/v2)
 
 Full-agent checkpoints are the language-agnostic interchange boundary. Any JSON
 parser can read or write them (e.g. Python `json.load`). Produced by
 `toCheckpointJson` / `saveCheckpointToFile`, consumed by `fromCheckpointJson` /
 `loadCheckpointFromFile` (`include/serialization.h`, glaze backend, DTO isolated
-to `src/serialization.cpp`).
+to `src/serialization.cpp`). When `ODNEAT_ENABLE_SERIALIZATION=OFF` the glaze
+backend is excluded and `ODNEAT_ENABLE_SERIALIZATION=0` is defined; consumers
+then provide their own translator for the same field names.
+
+v2 additions over v1: per-neuron `activation` strings (full 16-function CPPN set;
+missing in v1 defaults to `"logistic"`), `parameters.activation_mutate_rate` and
+`parameters.activation_mismatch_coefficient` (optional; missing defaults to `0.0`).
+Unknown keys are ignored throughout.
 
 ## Envelope
 
@@ -13,10 +20,10 @@ Top-level object, flat, `snake_case` keys (stable within a format version):
 | Key | Type | Notes |
 |---|---|---|
 | `format` | string | Always `"odneat-agent-checkpoint"`. Mismatch fails. |
-| `version` | int | Always `1`. Mismatch fails. |
+| `version` | int | `1` (legacy) or `2` (activation strings). Other versions fail. |
 | `robot_identifier` | uint | Must match the restoring agent's id. |
 | `input_count`, `output_count` | int | Must match the restoring agent's dimensions. |
-| `parameters` | object | All `OdneatParams` fields; adopted on restore. |
+| `parameters` | object | All `OdneatParams` fields (incl. `activation_mutate_rate`, `activation_mismatch_coefficient`); adopted on restore. |
 | `active` | object | Active `Genome` (see genome object). |
 | `population` | array | Internal population in insertion order (1..N). |
 | `tabu` | array | Tabu genomes (may be empty). |
@@ -48,7 +55,7 @@ are recomputed on load; network activations reset. Single-genome documents use
 }
 ```
 
-`neuron_type` is one of `"input"`, `"hidden"`, `"output"`, `"bias"`.
+`neuron_type` is one of `"input"`, `"hidden"`, `"output"`, `"bias"`. `activation` is one of the 16 CPPN strings (`logistic` default).
 Doubles round-trip exactly; weights are bit-identical after load.
 
 ## Python example

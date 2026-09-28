@@ -33,12 +33,17 @@ namespace odneat {
     // InternalPopulation stores up to max_population_size genomes with their species partition.
     class InternalPopulation {
        public:
-        // Constructs an empty population honouring the given capacity and speciation settings.
+        // Constructs an empty population honouring the given capacity and speciation settings (activation term opt-in, default 0).
         InternalPopulation(int maximum_population_size,
                            double disjoint_coefficient,
                            double excess_coefficient,
                            double weight_difference_coefficient,
-                           double kCompatibilityThreshold);
+                           double kCompatibilityThreshold,
+                           double activation_mismatch_coefficient = 0.0);
+        // Sets the activation-mismatch weight used by subsequent re-speciations.
+        void setActivationMismatchCoefficient(double activation_mismatch_coefficient);
+        // Returns the activation-mismatch weight.
+        double getActivationMismatchCoefficient() const;
         // Returns the stored genomes in insertion order.
         const std::vector<Genome> &getGenomes() const;
         // Returns the current species partition.
@@ -99,6 +104,8 @@ namespace odneat {
         double weight_difference_coefficient_;
         // Speciation threshold delta.
         double compatibility_threshold_;
+        // Opt-in activation-mismatch weight (0 = legacy distances).
+        double activation_mismatch_coefficient_ = 0.0;
         // Stored genomes in insertion order.
         std::vector<Genome> genomes_;
         // Current species partition over genomes_.

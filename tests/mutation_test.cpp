@@ -188,6 +188,57 @@ int run_mutation_suite() {
         }
     }
 
+    // Activation resampling is off by default and fires when enabled.
+    {
+        odneat::InnovationClock clock(99);
+        odneat::Genome g = odneat::Genome::createMinimalGenome(2, 1, clock);
+        odneat::OdneatParams params{};
+        odneat::MutationOutcome outcome{};
+        {
+            std::mt19937_64 rng(1ULL);
+            odneat::InnovationClock c2(99);
+            odneat::Genome trial = g;
+            odneat::mutateGenome(trial, c2, rng, params, &outcome);
+            if (outcome.resampled_activations != 0) {
+                std::cout << "FAIL: activation off by default\n";
+                ++failure_count;
+            }
+        }
+        params.activation_mutate_rate = 1.0;
+        bool saw_non_logistic = false;
+        for (int i = 0; i < 20; ++i) {
+            std::mt19937_64 rng(static_cast<std::uint64_t>(100 + i));
+            odneat::InnovationClock c3(99);
+            odneat::Genome trial = g;
+            odneat::mutateGenome(trial, c3, rng, params, nullptr);
+            for (const auto &ng : trial.getNeuronGenes()) {
+                if (ng.activation != odneat::ActivationFn::kLogistic) saw_non_logistic = true;
+            }
+        }
+        if (!saw_non_logistic) {
+            std::cout << "FAIL: activation never resampled\n";
+            ++failure_count;
+        }
+        // Resampled transfer functions always stay inside the extended enum.
+        {
+            bool valid = true;
+            for (int i = 0; i < 20; ++i) {
+                std::mt19937_64 rng(static_cast<std::uint64_t>(200 + i));
+                odneat::InnovationClock c4(99);
+                odneat::Genome trial = g;
+                odneat::mutateGenome(trial, c4, rng, params, nullptr);
+                for (const auto &ng : trial.getNeuronGenes()) {
+                    const auto raw = static_cast<int>(ng.activation);
+                    if (raw < 0 || raw > 15) valid = false;
+                }
+            }
+            if (!valid) {
+                std::cout << "FAIL: activation resample out of range\n";
+                ++failure_count;
+            }
+        }
+    }
+
     if (failure_count == 0) {
         std::cout << "test_mutation passed\n";
     }

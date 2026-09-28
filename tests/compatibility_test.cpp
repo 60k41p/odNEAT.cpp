@@ -113,6 +113,28 @@ int run_compatibility_suite() {
         report_failure(live[0].average_adjusted_fitness == 7.5, "species average of adjusted fitness");
     }
 
+    // Activation mismatches are ignored by default and separate species when weighted.
+    {
+        odneat::Genome g1 = first_genome, g2 = first_genome;
+        for (auto &ng : g2.accessNeuronGenes()) {
+            if (ng.neuron_type == odneat::NeuronType::kOutput) ng.activation = odneat::ActivationFn::kSin;
+        }
+        report_failure(odneat::computeCompatibilityDistance(g1, g2, 1.0, 1.0, 0.4) == 0.0, "default coefficient preserves distances");
+        const odneat::CompatibilityBreakdown bd = odneat::analyseCompatibility(g1, g2, 1.0, 1.0, 0.4, 1.0);
+        report_failure(bd.activation_mismatch_count == 2, "transfer mismatches counted");
+        report_failure(bd.distance == 2.0, "mismatches weighted over N=1");
+        report_failure(!odneat::areGenomesCompatible(g1, g2, 1.0, 1.0, 0.4, 0.5, 1.0), "weighted mismatch splits species");
+        report_failure(odneat::areGenomesCompatible(g1, g2, 1.0, 1.0, 0.4, 0.5), "unweighted mismatch stays compatible");
+        // speciatePopulation threads the term: default keeps one species, weighted splits.
+        {
+            std::vector<odneat::Genome> pair{g1, g2};
+            const std::vector<odneat::Species> merged = odneat::speciatePopulation(pair, 1.0, 1.0, 0.4, 3.0);
+            report_failure(merged.size() == 1u, "speciate default merges activation variants");
+            const std::vector<odneat::Species> split = odneat::speciatePopulation(pair, 1.0, 1.0, 0.4, 0.5, 1.0);
+            report_failure(split.size() == 2u, "speciate weighted splits activation variants");
+        }
+    }
+
     if (failure_count == 0) {
         std::cout << "test_compatibility passed\n";
     }

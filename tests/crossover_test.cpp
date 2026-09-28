@@ -145,6 +145,53 @@ int run_crossover_suite() {
         }
     }
 
+    // Matching-neuron activation coin-flip recombines CPPN transfer functions without touching topology.
+    {
+        odneat::InnovationClock clock(9);
+        odneat::Genome p1 = odneat::Genome::createMinimalGenome(2, 1, clock);
+        odneat::Genome p2 = p1;
+        for (auto &ng : p1.accessNeuronGenes()) {
+            if (ng.neuron_type == odneat::NeuronType::kOutput) ng.activation = odneat::ActivationFn::kIdentity;
+        }
+        for (auto &ng : p2.accessNeuronGenes()) {
+            if (ng.neuron_type == odneat::NeuronType::kOutput) ng.activation = odneat::ActivationFn::kSin;
+        }
+        p1.setFitness(7.0);
+        p2.setFitness(7.0);
+        int weaker_wins = 0;
+        const int runs = 100;
+        for (std::uint64_t seed = 0; seed < static_cast<std::uint64_t>(runs); ++seed) {
+            std::mt19937_64 xrng(seed);
+            odneat::CrossoverOutcome xo{};
+            const odneat::Genome child = odneat::crossoverGenomes(p1, p2, xrng, 0.75, &xo);
+            if (child.getConnectionGenes().size() != p1.getConnectionGenes().size() || child.getNeuronGenes().size() != p1.getNeuronGenes().size()) {
+                std::cout << "FAIL: coin-flip must preserve topology\n";
+                ++failure_count;
+                break;
+            }
+            bool took_weaker = false;
+            for (const auto &ng : child.getNeuronGenes()) {
+                if (ng.neuron_type == odneat::NeuronType::kOutput) took_weaker = (ng.activation == odneat::ActivationFn::kSin);
+            }
+            if (took_weaker) {
+                ++weaker_wins;
+                if (xo.flipped_activations != 1) {
+                    std::cout << "FAIL: flip counter undercounts\n";
+                    ++failure_count;
+                    break;
+                }
+            } else if (xo.flipped_activations != 0) {
+                std::cout << "FAIL: flip counter overcounts\n";
+                ++failure_count;
+                break;
+            }
+        }
+        if (weaker_wins == 0 || weaker_wins == runs) {
+            std::cout << "FAIL: activation coin-flip never both sides\n";
+            ++failure_count;
+        }
+    }
+
     if (failure_count == 0) {
         std::cout << "test_crossover passed\n";
     }

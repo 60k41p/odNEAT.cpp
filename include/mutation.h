@@ -30,6 +30,8 @@ namespace odneat {
         bool added_neuron = false;
         // Whether any enabled flag was toggled.
         bool toggled_enabled = false;
+        // Number of neuron activation functions resampled.
+        int resampled_activations = 0;
     };
 
     // Perturbs weights, toggles enabled flags and augments topology according to the given rates.

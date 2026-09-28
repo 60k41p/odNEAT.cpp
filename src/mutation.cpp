@@ -136,7 +136,25 @@ namespace odneat {
 
         // Stanley bias-neuron model: no per-neuron bias to perturb; bias evolves via bias->X weights.
         // perturbed_biases retained in MutationOutcome for API compat (always 0).
-        (void)genome;
+        if (parameters.activation_mutate_rate > 0.0) {
+            constexpr ActivationFn kActivationChoices[] = {
+                ActivationFn::kLogistic,       ActivationFn::kIdentity, ActivationFn::kTanh,     ActivationFn::kSin,
+                ActivationFn::kGaussian,       ActivationFn::kAbs,      ActivationFn::kRelu,     ActivationFn::kLelu,
+                ActivationFn::kSquare,         ActivationFn::kSawtooth, ActivationFn::kTriangle, ActivationFn::kSmoothSquare,
+                ActivationFn::kSmoothSawtooth, ActivationFn::kExp,      ActivationFn::kLog,      ActivationFn::kInv};
+            std::uniform_int_distribution<std::size_t> activation_picker(0, sizeof(kActivationChoices) / sizeof(kActivationChoices[0]) - 1);
+            for (NeuronGene &neuron_gene : genome.accessNeuronGenes()) {
+                if (neuron_gene.neuron_type != NeuronType::kHidden && neuron_gene.neuron_type != NeuronType::kOutput) {
+                    continue;
+                }
+                if (unitDistribution(randomGenerator) < parameters.activation_mutate_rate) {
+                    neuron_gene.activation = kActivationChoices[activation_picker(randomGenerator)];
+                    ++local_outcome.resampled_activations;
+                }
+            }
+        } else {
+            (void)genome;
+        }
 
         if (unitDistribution(randomGenerator) < parameters.add_connection_rate) {
             local_outcome.added_connection =

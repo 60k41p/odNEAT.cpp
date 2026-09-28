@@ -10,12 +10,20 @@ namespace odneat {
                                            double disjoint_coefficient,
                                            double excess_coefficient,
                                            double weight_difference_coefficient,
-                                           double kCompatibilityThreshold)
+                                           double kCompatibilityThreshold,
+                                           double activation_mismatch_coefficient)
         : maximum_population_size_(maximum_population_size),
           disjoint_coefficient_(disjoint_coefficient),
           excess_coefficient_(excess_coefficient),
           weight_difference_coefficient_(weight_difference_coefficient),
-          compatibility_threshold_(kCompatibilityThreshold) {}
+          compatibility_threshold_(kCompatibilityThreshold),
+          activation_mismatch_coefficient_(activation_mismatch_coefficient) {}
+
+    void InternalPopulation::setActivationMismatchCoefficient(double activation_mismatch_coefficient) {
+        activation_mismatch_coefficient_ = activation_mismatch_coefficient;
+    }
+
+    double InternalPopulation::getActivationMismatchCoefficient() const { return activation_mismatch_coefficient_; }
 
     const std::vector<Genome> &InternalPopulation::getGenomes() const { return genomes_; }
 
@@ -244,7 +252,8 @@ namespace odneat {
             return;
         }
 
-        species_list_ = speciatePopulation(genomes_, disjoint_coefficient_, excess_coefficient_, weight_difference_coefficient_, compatibility_threshold_);
+        species_list_ = speciatePopulation(genomes_, disjoint_coefficient_, excess_coefficient_, weight_difference_coefficient_, compatibility_threshold_,
+                                           activation_mismatch_coefficient_);
         refreshFitnessSharing();
     }
 
