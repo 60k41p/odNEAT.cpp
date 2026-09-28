@@ -26,25 +26,37 @@ namespace odneat {
         double mean_weight_difference = 0.0;
         // Number of matching connection genes sharing an InnovationId.
         std::size_t matching_count = 0;
+        // Number of matching hidden/output neurons whose transfer functions differ.
+        std::size_t activation_mismatch_count = 0;
         // Normalisation factor N (larger genome size, or 1 for small genomes).
         double normaliser = 1.0;
         // Final weighted distance value.
         double distance = 0.0;
     };
 
-    // Computes the NEAT compatibility distance between two genomes using the given coefficients.
-    double computeCompatibilityDistance(
-        const Genome &first_genome, const Genome &second_genome, double disjoint_coefficient, double excess_coefficient, double weight_difference_coefficient);
+    // Computes the NEAT compatibility distance between two genomes using the given coefficients. The activation term is opt-in (default 0 preserves
+    // current distances): matching hidden/output neurons with differing transfer functions add activation_mismatch_coefficient * mismatches / N.
+    double computeCompatibilityDistance(const Genome &first_genome,
+                                        const Genome &second_genome,
+                                        double disjoint_coefficient,
+                                        double excess_coefficient,
+                                        double weight_difference_coefficient,
+                                        double activation_mismatch_coefficient = 0.0);
     // Computes the distance and returns every intermediate component for inspection.
-    CompatibilityBreakdown analyseCompatibility(
-        const Genome &first_genome, const Genome &second_genome, double disjoint_coefficient, double excess_coefficient, double weight_difference_coefficient);
+    CompatibilityBreakdown analyseCompatibility(const Genome &first_genome,
+                                                const Genome &second_genome,
+                                                double disjoint_coefficient,
+                                                double excess_coefficient,
+                                                double weight_difference_coefficient,
+                                                double activation_mismatch_coefficient = 0.0);
     // Returns true when the distance between two genomes is below the speciation threshold.
     bool areGenomesCompatible(const Genome &first_genome,
                               const Genome &second_genome,
                               double disjoint_coefficient,
                               double excess_coefficient,
                               double weight_difference_coefficient,
-                              double compatibility_threshold);
+                              double compatibility_threshold,
+                              double activation_mismatch_coefficient = 0.0);
 
     // Species is one niche of similar genomes sharing fitness.
     // Citation: Stanley and Miikkulainen (2002), Section 3.3 on explicit fitness sharing.
@@ -59,12 +71,14 @@ namespace odneat {
         double average_adjusted_fitness = 0.0;
     };
 
-    // Assigns each genome index to the first compatible species or creates a new species.
+    // Assigns each genome index to the first compatible species or creates a new species. The activation term is opt-in (default 0 preserves legacy
+    // partitions); pass a positive weight to separate species by CPPN transfer function.
     std::vector<Species> speciatePopulation(const std::vector<Genome> &genomes,
                                             double disjoint_coefficient,
                                             double excess_coefficient,
                                             double weight_difference_coefficient,
-                                            double compatibility_threshold);
+                                            double compatibility_threshold,
+                                            double activation_mismatch_coefficient = 0.0);
     // Applies explicit fitness sharing: adjusted_fitness = fitness / species_size for every genome.
     void applyFitnessSharing(std::vector<Genome> &genomes, const std::vector<Species> &species_list);
     // Recomputes average_adjusted_fitness for every species from current adjusted fitness values.

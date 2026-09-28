@@ -10,6 +10,60 @@ namespace odneat {
 
     double computeLogisticActivation(double weighted_sum, double bias, double slope) { return 1.0 / (1.0 + std::exp(-slope * (weighted_sum + bias))); }
 
+    double computeActivation(ActivationFn activation_function, double weighted_sum, double slope) {
+        // Periodic and scalar CPPN forms: square is the sign(sin(2πz)) wave (not z²), sawtooth/triangle are the arctan/arcsin closed forms, smooth_* are
+        // the tanh-shaped variants. exp/log/inv/lelu are guarded to stay finite on arbitrary sums and keep recurrent phenotypes bounded: exp clamps its
+        // argument, log/inv clamp near zero, lelu uses slope 0.1.
+        constexpr double kPi = 3.14159265358979323846;
+        constexpr double kExpArgLimit = 15.0;
+        constexpr double kNearZeroGuard = 1e-7;
+        constexpr double kLeluSlope = 0.1;
+        switch (activation_function) {
+            case ActivationFn::kIdentity:
+                return weighted_sum;
+            case ActivationFn::kTanh:
+                return std::tanh(weighted_sum);
+            case ActivationFn::kSin:
+                return std::sin(weighted_sum);
+            case ActivationFn::kGaussian:
+                return std::exp(-weighted_sum * weighted_sum);
+            case ActivationFn::kAbs:
+                return std::fabs(weighted_sum);
+            case ActivationFn::kRelu:
+                return weighted_sum > 0.0 ? weighted_sum : 0.0;
+            case ActivationFn::kLelu:
+                return weighted_sum >= 0.0 ? weighted_sum : kLeluSlope * weighted_sum;
+            case ActivationFn::kSquare: {
+                const double wave = std::sin(2.0 * kPi * weighted_sum);
+                return wave > 0.0 ? 1.0 : (wave < 0.0 ? -1.0 : 0.0);
+            }
+            case ActivationFn::kSawtooth:
+                // IEEE division carries the pole: 1/tan(πz) is ±inf at integers, atan maps it to ±π/2 for an exact closed-form sawtooth.
+                return 2.0 / kPi * std::atan(1.0 / std::tan(kPi * weighted_sum));
+            case ActivationFn::kTriangle: {
+                const double wave = std::sin(2.0 * kPi * weighted_sum);
+                const double clamped = std::min(1.0, std::max(-1.0, wave));
+                return 2.0 / kPi * std::asin(clamped);
+            }
+            case ActivationFn::kSmoothSquare:
+                return std::tanh(5.0 * std::sin(2.0 * weighted_sum));
+            case ActivationFn::kSmoothSawtooth: {
+                const double product = std::tanh(5.0 * std::sin(weighted_sum)) * std::cos(weighted_sum);
+                const double clamped = std::min(1.0, std::max(-1.0, product));
+                return std::asin(clamped);
+            }
+            case ActivationFn::kExp:
+                return std::exp(std::min(kExpArgLimit, std::max(-kExpArgLimit, weighted_sum)));
+            case ActivationFn::kLog:
+                return std::log(std::max(kNearZeroGuard, weighted_sum));
+            case ActivationFn::kInv:
+                return std::fabs(weighted_sum) > kNearZeroGuard ? 1.0 / weighted_sum : (weighted_sum >= 0.0 ? 1.0 / kNearZeroGuard : -1.0 / kNearZeroGuard);
+            case ActivationFn::kLogistic:
+            default:
+                return computeLogisticActivation(weighted_sum, 0.0, slope);
+        }
+    }
+
     RecurrentNetwork RecurrentNetwork::decodeFromGenome(const Genome &genome, int input_count, int output_count, double logistic_slope) {
         RecurrentNetwork decoded_network{};
         decoded_network.input_count_ = input_count;
@@ -26,6 +80,7 @@ namespace odneat {
             compact_neuron.is_input = (neuron_gene.neuron_type == NeuronType::kInput);
             compact_neuron.is_bias = (neuron_gene.neuron_type == NeuronType::kBias);
             compact_neuron.input_index = neuron_gene.input_index;
+            compact_neuron.activation_function = neuron_gene.activation;
             compact_neuron.is_output = (neuron_gene.neuron_type == NeuronType::kOutput);
             compact_neuron.output_index = neuron_gene.output_index;
             compact_neuron.activation = compact_neuron.is_bias ? 1.0 : 0.0;
@@ -94,7 +149,7 @@ namespace odneat {
                 continue;
             }
 
-            nextActivations[neuron_index] = computeLogisticActivation(weightedSums[neuron_index], 0.0, logistic_slope_);
+            nextActivations[neuron_index] = computeActivation(neuron.activation_function, weightedSums[neuron_index], logistic_slope_);
         }
 
         for (std::size_t neuron_index = 0; neuron_index < neurons_.size(); ++neuron_index) {

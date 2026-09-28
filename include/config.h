@@ -43,6 +43,9 @@ namespace odneat {
         double add_connection_rate = 0.05;
         // Per-offspring probability of adding one new neuron gene by splitting a connection.
         double add_neuron_rate = 0.03;
+        // Per-neuron probability of resampling a hidden/output activation function (CPPN mode).
+        // Defaults to off so legacy odNEAT runs never change transfer functions.
+        double activation_mutate_rate = 0.0;
         // Probability of toggling a connection enabled flag during mutation. Not in either paper
         // (NEAT propagates disabled state via crossover only); defaults to off, opt in for experiments.
         double toggle_enabled_rate = 0.0;
@@ -54,6 +57,8 @@ namespace odneat {
         double disjoint_coefficient = DefaultConstants::kCompatibilityDisjointCoefficient;
         double excess_coefficient = DefaultConstants::kCompatibilityExcessCoefficient;
         double weight_difference_coefficient = DefaultConstants::kCompatibilityWeightCoefficient;
+        // Opt-in activation-mismatch weight for the CPPN transfer-function term (default 0 preserves legacy distances).
+        double activation_mismatch_coefficient = 0.0;
         // Maximum number of genomes stored in each robot's internal population (Table 2: 40).
         int internal_population_size = 40;
         // Minimum control cycles a new controller is protected from replacement (Section 4.1: 500 cycles / 50 s).

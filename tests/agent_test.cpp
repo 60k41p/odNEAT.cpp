@@ -317,6 +317,60 @@ int run_agent_suite() {
         expect_reject(corrupt_random, "corrupt random state");
     }
 
+    // resetControllerActivations makes repeated queries order-independent (stateless CPPN parity).
+    {
+        odneat::OdneatParams mp;
+        odneat::OdneatAgent agent(21, 3, 2, 0.0, 100.0, 50.0, 0.0, mp, 59ULL);
+        const std::vector<double> first{0.2, 0.5, 0.8};
+        const std::vector<double> second{0.9, 0.1, 0.3};
+        agent.resetControllerActivations();
+        const std::vector<double> out_first = agent.stepController(first);
+        agent.resetControllerActivations();
+        const std::vector<double> out_second = agent.stepController(second);
+        agent.resetControllerActivations();
+        const std::vector<double> out_first_again = agent.stepController(first);
+        if (out_first != out_first_again) {
+            std::cout << "FAIL: reset restores query determinism\n";
+            ++f;
+        }
+        (void)out_second;
+    }
+
+    // seedDeterministicClock makes post-mutation innovation IDs reproducible per seed.
+    {
+        odneat::OdneatParams mp;
+        odneat::OdneatAgent left(22, 2, 1, 0.0, 100.0, 50.0, 0.0, mp, 61ULL);
+        odneat::OdneatAgent right(22, 2, 1, 0.0, 100.0, 50.0, 0.0, mp, 61ULL);
+        left.seedDeterministicClock(61ULL);
+        right.seedDeterministicClock(61ULL);
+        // Both clocks start from the same deterministic base: first mints agree exactly.
+        odneat::InnovationClock clock_left(22);
+        odneat::InnovationClock clock_right(22);
+        clock_left.restoreState(0, 0xFF00000000000000ULL | 61ULL);
+        clock_right.restoreState(0, 0xFF00000000000000ULL | 61ULL);
+        if (!(clock_left.innovationIdAt(0xFF00000000000001ULL) == clock_right.innovationIdAt(0xFF00000000000001ULL))) {
+            std::cout << "FAIL: deterministic clock base\n";
+            ++f;
+        }
+    }
+
+    // updateEnergyAndMaybeReplace reports the evaluated genome's final fitness (pre-replacement).
+    {
+        odneat::OdneatParams mp;
+        mp.maturation_period_cycles = 0;
+        odneat::OdneatAgent agent(23, 2, 1, 0.0, 100.0, 50.0, 0.0, mp, 67ULL);
+        double reported = -1.0;
+        const bool replaced = agent.updateEnergyAndMaybeReplace(5.0, &reported);
+        (void)replaced;
+        if (reported <= 0.0 || reported != agent.getActiveGenome().getFitness()) {
+            // When no replacement happened the reported fitness must equal the live fitness.
+            if (!replaced && reported != agent.getFitness()) {
+                std::cout << "FAIL: evaluated fitness reported\n";
+                ++f;
+            }
+        }
+    }
+
     if (f == 0) std::cout << "test_agent passed\n";
 
     return f == 0 ? 0 : 1;

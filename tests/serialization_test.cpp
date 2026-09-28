@@ -114,6 +114,25 @@ int run_serialization_suite() {
         checkCondition(restored.getFitnessSampleCount() == agent.getFitnessSampleCount() + 1, "restored agent steps", failure_count);
     }
 
+    // Activation-mismatch coefficient round-trips through checkpoint JSON.
+    {
+        odneat::OdneatParams tuned{};
+        tuned.maturation_period_cycles = 5;
+        tuned.internal_population_size = 10;
+        tuned.activation_mismatch_coefficient = 0.75;
+        odneat::OdneatAgent source(19, 4, 2, 0.0, 100.0, 50.0, 0.0, tuned, 2024ULL);
+        odneat::OdneatParams fresh{};
+        fresh.maturation_period_cycles = 5;
+        fresh.internal_population_size = 10;
+        odneat::OdneatAgent restored(19, 4, 2, 0.0, 100.0, 50.0, 0.0, fresh, 999ULL);
+        std::string json_output{};
+        std::string error_message{};
+        checkCondition(odneat::toCheckpointJson(source, json_output, &error_message), "mismatch params serialise", failure_count);
+        checkCondition(odneat::fromCheckpointJson(json_output, restored, &error_message), "mismatch params restore", failure_count);
+        checkCondition(restored.getParameters().activation_mismatch_coefficient == 0.75, "mismatch coefficient preserved", failure_count);
+        checkCondition(restored.getPopulation().getActivationMismatchCoefficient() == 0.75, "population adopts mismatch coefficient", failure_count);
+    }
+
     // Pretty documents parse through the same path.
     {
         odneat::OdneatAgent agent = makeEvolvedAgent(11, 777ULL);
@@ -275,6 +294,61 @@ int run_serialization_suite() {
         const std::string missing = (std::filesystem::temp_directory_path() / "odneat_does_not_exist_12345.json").string();
         checkCondition(!odneat::loadCheckpointFromFile(missing, restored, &error_message), "missing checkpoint fails", failure_count);
         checkCondition(!odneat::loadGenomeFromFile(missing, genome_output, &error_message), "missing genome fails", failure_count);
+    }
+
+    // Activation functions round-trip through genome JSON documents.
+    {
+        odneat::InnovationClock clock(77);
+        odneat::Genome genome = odneat::Genome::createMinimalGenome(2, 1, clock);
+        for (auto &ng : genome.accessNeuronGenes()) {
+            if (ng.neuron_type == odneat::NeuronType::kHidden || ng.neuron_type == odneat::NeuronType::kOutput) {
+                ng.activation = odneat::ActivationFn::kGaussian;
+            }
+        }
+        std::string json{};
+        std::string error_message{};
+        checkCondition(odneat::toGenomeJson(genome, json, &error_message), "activation genome serialises", failure_count);
+        odneat::Genome restored{};
+        checkCondition(odneat::fromGenomeJson(json, restored, &error_message), "activation genome parses", failure_count);
+        bool kept = false;
+        for (const auto &ng : restored.getNeuronGenes()) {
+            if (ng.activation == odneat::ActivationFn::kGaussian) kept = true;
+        }
+        checkCondition(kept, "activation survives round-trip", failure_count);
+    }
+
+    // Every transfer function in the extended set survives a JSON round-trip.
+    {
+        const odneat::ActivationFn all[] = {
+            odneat::ActivationFn::kLogistic,       odneat::ActivationFn::kIdentity, odneat::ActivationFn::kTanh,     odneat::ActivationFn::kSin,
+            odneat::ActivationFn::kGaussian,       odneat::ActivationFn::kAbs,      odneat::ActivationFn::kRelu,     odneat::ActivationFn::kLelu,
+            odneat::ActivationFn::kSquare,         odneat::ActivationFn::kSawtooth, odneat::ActivationFn::kTriangle, odneat::ActivationFn::kSmoothSquare,
+            odneat::ActivationFn::kSmoothSawtooth, odneat::ActivationFn::kExp,      odneat::ActivationFn::kLog,      odneat::ActivationFn::kInv};
+        for (odneat::ActivationFn activation : all) {
+            odneat::InnovationClock clock(78);
+            odneat::Genome genome = odneat::Genome::createMinimalGenome(2, 1, clock);
+            for (auto &ng : genome.accessNeuronGenes()) {
+                if (ng.neuron_type == odneat::NeuronType::kHidden || ng.neuron_type == odneat::NeuronType::kOutput) ng.activation = activation;
+            }
+            std::string json{};
+            std::string error_message{};
+            if (!odneat::toGenomeJson(genome, json, &error_message)) {
+                checkCondition(false, "extended activation serialises", failure_count);
+                continue;
+            }
+            odneat::Genome restored{};
+            if (!odneat::fromGenomeJson(json, restored, &error_message)) {
+                checkCondition(false, "extended activation parses", failure_count);
+                continue;
+            }
+            bool kept_all = true;
+            for (const auto &ng : restored.getNeuronGenes()) {
+                if ((ng.neuron_type == odneat::NeuronType::kHidden || ng.neuron_type == odneat::NeuronType::kOutput) && ng.activation != activation) {
+                    kept_all = false;
+                }
+            }
+            checkCondition(kept_all, "extended activation survives round-trip", failure_count);
+        }
     }
 
     if (failure_count == 0) {

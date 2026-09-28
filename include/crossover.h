@@ -23,6 +23,8 @@ namespace odneat {
         int disjoint_excess_genes = 0;
         // Number of inherited connections left disabled in the offspring.
         int disabled_genes = 0;
+        // Number of matching neurons whose activation was coin-flipped between parents.
+        int flipped_activations = 0;
     };
 
     // Recombines two parents into one offspring genome; fitness decides disjoint/excess inheritance on non-ties.

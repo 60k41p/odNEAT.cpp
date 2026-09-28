@@ -23,9 +23,26 @@ namespace odneat {
         }
 
         Genome offspring{};
+        CrossoverOutcome local_outcome{};
+        std::uniform_real_distribution<double> unitDistribution(0.0, 1.0);
+
+        // Matching-neuron activation coin-flip: disjoint/excess neurons carry intact (existing behavior), but when both parents share a neuron by
+        // historical marking the offspring takes either parent's transfer function with equal probability, so CPPN function diversity recombines.
+        std::unordered_map<InnovationId, const NeuronGene *, InnovationIdHash> weaker_neurons_by_id{};
+        weaker_neurons_by_id.reserve(weaker_parent.getNeuronGenes().size() * 2);
+        for (const NeuronGene &neuron_gene : weaker_parent.getNeuronGenes()) {
+            weaker_neurons_by_id.emplace(neuron_gene.innovation_id, &neuron_gene);
+        }
 
         for (const NeuronGene &neuron_gene : fitter_parent.getNeuronGenes()) {
-            offspring.addNeuronGene(neuron_gene);
+            NeuronGene inherited_neuron = neuron_gene;
+            const auto weaker_neuron_entry = weaker_neurons_by_id.find(neuron_gene.innovation_id);
+            if (weaker_neuron_entry != weaker_neurons_by_id.end() && weaker_neuron_entry->second->activation != neuron_gene.activation &&
+                unitDistribution(randomGenerator) < 0.5) {
+                inherited_neuron.activation = weaker_neuron_entry->second->activation;
+                ++local_outcome.flipped_activations;
+            }
+            offspring.addNeuronGene(inherited_neuron);
         }
 
         for (const NeuronGene &neuron_gene : weaker_parent.getNeuronGenes()) {
@@ -35,9 +52,6 @@ namespace odneat {
                 }
             }
         }
-
-        CrossoverOutcome local_outcome{};
-        std::uniform_real_distribution<double> unitDistribution(0.0, 1.0);
 
         for (const ConnectionGene &fitter_gene : fitter_parent.getConnectionGenes()) {
             const auto weaker_entry = weaker_by_id.find(fitter_gene.innovation_id);

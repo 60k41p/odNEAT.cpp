@@ -1,5 +1,6 @@
 #include "network.h"
 
+#include <cmath>
 #include <iostream>
 #include <vector>
 
@@ -126,6 +127,78 @@ int run_network_suite() {
 
         if (odneat::clampSensorInput(-1.0) != 0.0 || odneat::clampSensorInput(2.0) != 1.0) {
             std::cout << "FAIL: clamp edges\n";
+            ++f;
+        }
+    }
+
+    // Activation dispatch: per-gene transfer functions evaluate correctly.
+    {
+        if (odneat::computeActivation(odneat::ActivationFn::kIdentity, 2.5, 1.0) != 2.5) {
+            std::cout << "FAIL: identity\n";
+            ++f;
+        }
+        if (odneat::computeActivation(odneat::ActivationFn::kRelu, -1.0, 1.0) != 0.0 ||
+            odneat::computeActivation(odneat::ActivationFn::kRelu, 3.0, 1.0) != 3.0) {
+            std::cout << "FAIL: relu\n";
+            ++f;
+        }
+        if (odneat::computeActivation(odneat::ActivationFn::kAbs, -2.0, 1.0) != 2.0) {
+            std::cout << "FAIL: abs\n";
+            ++f;
+        }
+        if (std::abs(odneat::computeActivation(odneat::ActivationFn::kSin, 0.0, 1.0)) > 1e-12 ||
+            std::abs(odneat::computeActivation(odneat::ActivationFn::kTanh, 0.0, 1.0)) > 1e-12 ||
+            std::abs(odneat::computeActivation(odneat::ActivationFn::kGaussian, 0.0, 1.0) - 1.0) > 1e-12) {
+            std::cout << "FAIL: periodic centers\n";
+            ++f;
+        }
+    }
+
+    // Extended CPPN transfer set: closed-form spot values plus finiteness over a sweep.
+    {
+        bool finite = true;
+        for (int a = 0; a <= 15; ++a) {
+            for (double z : {-3.0, -1.0, -0.5, 0.0, 0.5, 1.0, 3.0, 10.0}) {
+                if (!std::isfinite(odneat::computeActivation(static_cast<odneat::ActivationFn>(a), z, 1.0))) finite = false;
+            }
+        }
+        if (!finite) {
+            std::cout << "FAIL: transfer finiteness\n";
+            ++f;
+        }
+        if (odneat::computeActivation(odneat::ActivationFn::kSquare, 0.25, 1.0) != 1.0 ||
+            odneat::computeActivation(odneat::ActivationFn::kSquare, 0.75, 1.0) != -1.0 ||
+            odneat::computeActivation(odneat::ActivationFn::kSquare, 0.0, 1.0) != 0.0) {
+            std::cout << "FAIL: square wave\n";
+            ++f;
+        }
+        if (std::abs(odneat::computeActivation(odneat::ActivationFn::kSawtooth, 0.25, 1.0) - 0.5) > 1e-12 ||
+            std::abs(odneat::computeActivation(odneat::ActivationFn::kTriangle, 0.125, 1.0) - 0.5) > 1e-12 ||
+            std::abs(odneat::computeActivation(odneat::ActivationFn::kTriangle, 0.0, 1.0)) > 1e-12 ||
+            std::abs(odneat::computeActivation(odneat::ActivationFn::kSmoothSquare, 0.0, 1.0)) > 1e-12 ||
+            std::abs(odneat::computeActivation(odneat::ActivationFn::kSmoothSawtooth, 0.0, 1.0)) > 1e-12) {
+            std::cout << "FAIL: periodic centers\n";
+            ++f;
+        }
+        if (std::abs(odneat::computeActivation(odneat::ActivationFn::kLelu, -2.0, 1.0) + 0.2) > 1e-12 ||
+            odneat::computeActivation(odneat::ActivationFn::kLelu, 3.0, 1.0) != 3.0 || odneat::computeActivation(odneat::ActivationFn::kExp, 0.0, 1.0) != 1.0 ||
+            odneat::computeActivation(odneat::ActivationFn::kLog, 1.0, 1.0) != 0.0 || odneat::computeActivation(odneat::ActivationFn::kInv, 2.0, 1.0) != 0.5) {
+            std::cout << "FAIL: scalar guards\n";
+            ++f;
+        }
+    }
+
+    // A sin-activated output decodes and fires through the phenotype path.
+    {
+        odneat::InnovationClock c6(6);
+        odneat::Genome g6 = odneat::Genome::createMinimalGenome(1, 1, c6);
+        for (auto &ng : g6.accessNeuronGenes()) {
+            if (ng.neuron_type == odneat::NeuronType::kOutput) ng.activation = odneat::ActivationFn::kSin;
+        }
+        odneat::RecurrentNetwork n6 = odneat::RecurrentNetwork::decodeFromGenome(g6, 1, 1);
+        const std::vector<double> out6 = n6.stepNetwork({0.0});
+        if (out6.size() != 1) {
+            std::cout << "FAIL: cppn output size\n";
             ++f;
         }
     }

@@ -28,6 +28,8 @@ namespace odneat {
             std::string neuron_type{};
             int input_index = -1;
             int output_index = -1;
+            // Transfer function name; absent in v1 documents means logistic.
+            std::string activation{"logistic"};
         };
 
         struct ConnectionDto {
@@ -70,6 +72,8 @@ namespace odneat {
             double control_cycle_seconds = 0.0;
             double weight_minimum = 0.0;
             double weight_maximum = 0.0;
+            double activation_mutate_rate = 0.0;
+            double activation_mismatch_coefficient = 0.0;
         };
 
         struct CheckpointDto {
@@ -161,6 +165,112 @@ namespace odneat {
             return false;
         }
 
+        std::string activationToString(ActivationFn activation_function) {
+            switch (activation_function) {
+                case ActivationFn::kIdentity:
+                    return "identity";
+                case ActivationFn::kTanh:
+                    return "tanh";
+                case ActivationFn::kSin:
+                    return "sin";
+                case ActivationFn::kGaussian:
+                    return "gaussian";
+                case ActivationFn::kAbs:
+                    return "abs";
+                case ActivationFn::kRelu:
+                    return "relu";
+                case ActivationFn::kLelu:
+                    return "lelu";
+                case ActivationFn::kSquare:
+                    return "square";
+                case ActivationFn::kSawtooth:
+                    return "sawtooth";
+                case ActivationFn::kTriangle:
+                    return "triangle";
+                case ActivationFn::kSmoothSquare:
+                    return "smooth_square";
+                case ActivationFn::kSmoothSawtooth:
+                    return "smooth_sawtooth";
+                case ActivationFn::kExp:
+                    return "exp";
+                case ActivationFn::kLog:
+                    return "log";
+                case ActivationFn::kInv:
+                    return "inv";
+                case ActivationFn::kLogistic:
+                default:
+                    return "logistic";
+            }
+        }
+
+        bool activationFromString(const std::string &name, ActivationFn &activation_function) {
+            if (name == "logistic" || name.empty()) {
+                activation_function = ActivationFn::kLogistic;
+                return true;
+            }
+            if (name == "identity") {
+                activation_function = ActivationFn::kIdentity;
+                return true;
+            }
+            if (name == "tanh") {
+                activation_function = ActivationFn::kTanh;
+                return true;
+            }
+            if (name == "sin") {
+                activation_function = ActivationFn::kSin;
+                return true;
+            }
+            if (name == "gaussian") {
+                activation_function = ActivationFn::kGaussian;
+                return true;
+            }
+            if (name == "abs") {
+                activation_function = ActivationFn::kAbs;
+                return true;
+            }
+            if (name == "relu") {
+                activation_function = ActivationFn::kRelu;
+                return true;
+            }
+            if (name == "lelu") {
+                activation_function = ActivationFn::kLelu;
+                return true;
+            }
+            if (name == "square") {
+                activation_function = ActivationFn::kSquare;
+                return true;
+            }
+            if (name == "sawtooth") {
+                activation_function = ActivationFn::kSawtooth;
+                return true;
+            }
+            if (name == "triangle") {
+                activation_function = ActivationFn::kTriangle;
+                return true;
+            }
+            if (name == "smooth_square") {
+                activation_function = ActivationFn::kSmoothSquare;
+                return true;
+            }
+            if (name == "smooth_sawtooth") {
+                activation_function = ActivationFn::kSmoothSawtooth;
+                return true;
+            }
+            if (name == "exp") {
+                activation_function = ActivationFn::kExp;
+                return true;
+            }
+            if (name == "log") {
+                activation_function = ActivationFn::kLog;
+                return true;
+            }
+            if (name == "inv") {
+                activation_function = ActivationFn::kInv;
+                return true;
+            }
+            return false;
+        }
+
         checkpoint_dto::GenomeDto toGenomeDto(const Genome &genome) {
             checkpoint_dto::GenomeDto dto{};
             const std::vector<NeuronGene> &neurons = genome.getNeuronGenes();
@@ -171,6 +281,7 @@ namespace odneat {
                 neuron_dto.neuron_type = neuronTypeToString(neuron_gene.neuron_type);
                 neuron_dto.input_index = neuron_gene.input_index;
                 neuron_dto.output_index = neuron_gene.output_index;
+                neuron_dto.activation = activationToString(neuron_gene.activation);
                 dto.neurons.push_back(neuron_dto);
             }
             const std::vector<ConnectionGene> &connections = genome.getConnectionGenes();
@@ -205,6 +316,10 @@ namespace odneat {
                 }
                 neuron_gene.input_index = neuron_dto.input_index;
                 neuron_gene.output_index = neuron_dto.output_index;
+                if (!activationFromString(neuron_dto.activation, neuron_gene.activation)) {
+                    setError(error_message, "unknown activation: " + neuron_dto.activation);
+                    return false;
+                }
                 parsed.addNeuronGene(neuron_gene);
             }
             for (const checkpoint_dto::ConnectionDto &connection_dto : dto.connections) {
@@ -243,6 +358,8 @@ namespace odneat {
             dto.control_cycle_seconds = parameters.control_cycle_seconds;
             dto.weight_minimum = parameters.weight_minimum;
             dto.weight_maximum = parameters.weight_maximum;
+            dto.activation_mutate_rate = parameters.activation_mutate_rate;
+            dto.activation_mismatch_coefficient = parameters.activation_mismatch_coefficient;
             return dto;
         }
 
@@ -265,6 +382,8 @@ namespace odneat {
             parameters.control_cycle_seconds = dto.control_cycle_seconds;
             parameters.weight_minimum = dto.weight_minimum;
             parameters.weight_maximum = dto.weight_maximum;
+            parameters.activation_mutate_rate = dto.activation_mutate_rate;
+            parameters.activation_mismatch_coefficient = dto.activation_mismatch_coefficient;
             return parameters;
         }
 

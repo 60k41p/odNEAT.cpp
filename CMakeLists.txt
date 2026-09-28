@@ -14,6 +14,7 @@ option(ODNEAT_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
 option(ODNEAT_BUILD_DEMOS "Build experiment demos" ON)
 option(ODNEAT_BUILD_EXAMPLES "Build library usage examples" ON)
 option(ODNEAT_USE_SYSTEM_GLAZE "Use an installed glaze package instead of FetchContent" OFF)
+option(ODNEAT_ENABLE_SERIALIZATION "Build the glaze JSON checkpoint backend (when OFF, serialization.cpp is excluded and consumers provide their own checkpoint translator)" ON)
 option(ODNEAT_SANITIZE "Build with AddressSanitizer and UndefinedBehaviorSanitizer (Clang/GCC, via the sanitize preset)" OFF)
 option(BUILD_TESTING "Build CTest unit tests" ON)
 
@@ -69,6 +70,11 @@ target_include_directories(odneat PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 target_compile_features(odneat PUBLIC cxx_std_23)
+if(ODNEAT_ENABLE_SERIALIZATION)
+    target_compile_definitions(odneat PUBLIC ODNEAT_ENABLE_SERIALIZATION=1)
+else()
+    target_compile_definitions(odneat PUBLIC ODNEAT_ENABLE_SERIALIZATION=0)
+endif()
 # Glaze is a private header-only backend: needed to build serialization.cpp but
 # never appears in public headers, so it must not propagate to install consumers.
 target_link_libraries(odneat PRIVATE $<BUILD_INTERFACE:glaze::glaze>)

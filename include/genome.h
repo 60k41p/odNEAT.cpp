@@ -21,6 +21,31 @@ namespace odneat {
     // NeuronType distinguishes sensor inputs, evolvable hidden units and motor outputs.
     enum class NeuronType : std::uint8_t { kInput = 0, kHidden = 1, kOutput = 2, kBias = 3 };
 
+    // ActivationFn selects the transfer function applied by hidden and output neurons.
+    // kLogistic is the odNEAT default (Silva et al. 2015, Table 2); the remaining
+    // functions serve CPPN-encoded controllers (Stanley 2007) evaluated through
+    // the same phenotype path. Inputs and bias ignore this field. Periodic forms
+    // use closed-form wave definitions and scalar forms are guarded to stay finite
+    // on arbitrary weighted sums (documented in network.cpp).
+    enum class ActivationFn : std::uint8_t {
+        kLogistic = 0,
+        kIdentity = 1,
+        kTanh = 2,
+        kSin = 3,
+        kGaussian = 4,
+        kAbs = 5,
+        kRelu = 6,
+        kLelu = 7,
+        kSquare = 8,
+        kSawtooth = 9,
+        kTriangle = 10,
+        kSmoothSquare = 11,
+        kSmoothSawtooth = 12,
+        kExp = 13,
+        kLog = 14,
+        kInv = 15
+    };
+
     // NeuronGene describes one node in the decoded neural network.
     // Citation: Stanley and Miikkulainen (2002), Section 3.1: node genes with type and historical marking.
     // Bias is a dedicated kBias neuron with constant activation 1.0 (Stanley canon), not a per-neuron field.
@@ -29,6 +54,8 @@ namespace odneat {
         InnovationId innovation_id{};
         // Functional role of the neuron within the controller.
         NeuronType neuron_type = NeuronType::kHidden;
+        // Transfer function for hidden/output neurons (logistic default preserves legacy behavior).
+        ActivationFn activation = ActivationFn::kLogistic;
         // Index of the input sensor driving this neuron when it is an input, -1 otherwise.
         int input_index = -1;
         // Index of the motor output driven by this neuron when it is an output, -1 otherwise.

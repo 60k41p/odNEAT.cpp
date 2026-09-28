@@ -30,7 +30,8 @@ namespace odneat {
                       parameters.disjoint_coefficient,
                       parameters.excess_coefficient,
                       parameters.weight_difference_coefficient,
-                      parameters.compatibility_threshold),
+                      parameters.compatibility_threshold,
+                      parameters.activation_mismatch_coefficient),
           tabu_list_(parameters.disjoint_coefficient,
                      parameters.excess_coefficient,
                      parameters.weight_difference_coefficient,
@@ -171,7 +172,8 @@ namespace odneat {
         }
         parameters_ = state.parameters;
         population_ = InternalPopulation(state.parameters.internal_population_size, state.parameters.disjoint_coefficient, state.parameters.excess_coefficient,
-                                         state.parameters.weight_difference_coefficient, state.parameters.compatibility_threshold);
+                                         state.parameters.weight_difference_coefficient, state.parameters.compatibility_threshold,
+                                         state.parameters.activation_mismatch_coefficient);
         tabu_list_ = TabuList(state.parameters.disjoint_coefficient, state.parameters.excess_coefficient, state.parameters.weight_difference_coefficient,
                               state.parameters.compatibility_threshold, state.parameters.tabu_expiry_history_size);
         population_.restoreGenomes(state.population_genomes);
@@ -241,11 +243,12 @@ namespace odneat {
 
     std::vector<double> OdneatAgent::stepController(const std::vector<double> &sensor_inputs) { return active_controller_.stepNetwork(sensor_inputs); }
 
-    bool OdneatAgent::updateEnergyAndMaybeReplace(double energy_delta) {
+    bool OdneatAgent::updateEnergyAndMaybeReplace(double energy_delta, double *evaluated_fitness) {
         energy_tracker_.addEnergyDelta(energy_delta);
         fitness_averager_.addEnergySample(energy_tracker_.getEnergy());
         active_genome_.setFitness(fitness_averager_.getFitness());
         active_genome_.setEvaluationCount(fitness_averager_.getSampleCount());
+        if (evaluated_fitness != nullptr) *evaluated_fitness = fitness_averager_.getFitness();
         if (maturation_cycles_remaining_ > 0) {
             --maturation_cycles_remaining_;
         }
@@ -310,6 +313,16 @@ namespace odneat {
     void OdneatAgent::setSpeciationEnabled(bool speciation_enabled) {
         speciation_enabled_ = speciation_enabled;
         population_.setNichingEnabled(speciation_enabled);
+    }
+
+    void OdneatAgent::resetControllerActivations() { active_controller_.resetActivations(); }
+
+    void OdneatAgent::seedDeterministicClock(std::uint64_t seed) {
+        // 0xFF00... base (~1.8e19) stays above wall-clock nanos (~1.7e18) for centuries, so nextInnovationId() takes the deterministic last+1 branch.
+        // Low 32 bits carry the seed so distinct seeds mint distinct streams; robot_identifier still breaks cross-robot ties.
+        constexpr std::uint64_t kDeterministicBase = 0xFF00000000000000ULL;
+        const std::uint64_t base = kDeterministicBase | (seed & 0x00000000FFFFFFFFULL);
+        innovation_clock_.restoreState(0, base);
     }
 
     void OdneatAgent::incorporateReceivedGenomes(const std::vector<ReceivedGenome> &received_genomes,
